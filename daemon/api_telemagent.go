@@ -39,16 +39,16 @@ var (
 
 func getDeviceSession(c *Command, r *http.Request, user *auth.UserState) Response {
 
-	st := c.d.overlord.State()
-
+	st := c.d.state
+	st.Lock()
+	defer st.Unlock()
 	
-	devicestatetest.Device(st)
-	return SyncResponse([]string{"hello"})
-	// if err != nil {
-	// 	return SyncResponse(err)
-	// }
+	device, err := devicestatetest.Device(st)
+	if err != nil {
+		return SyncResponse(err)
+	}
 
 
-	// return SyncResponse([]string{device.SessionMacaroon})
+	return SyncResponse([]string{device.SessionMacaroon})
 }
 
