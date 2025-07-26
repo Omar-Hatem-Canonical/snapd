@@ -19,7 +19,15 @@
 
 package client
 
-import "errors"
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"time"
+)
 
 
 func (c *Client) DeviceSession() (deviceSession []string, err error) {
@@ -30,4 +38,58 @@ func (c *Client) DeviceSession() (deviceSession []string, err error) {
 	}
 
 	return
+}
+
+func (c *Client) Associate(email string, password string, otp string) error {
+	url := "http://localhost:1234"
+
+	var payload struct {
+		Email     string  `json:"email"`
+		Password  string  `json:"password"`
+		OTP       string  `json:"otp"`
+		Macaroon  string  `json:"macaroon"`
+	}
+
+	payload.Email = email
+	payload.Password = password
+	payload.OTP = otp
+
+	macaroon, err := c.DeviceSession()
+	if err != nil {
+		return err
+	}
+
+	payload.Macaroon = macaroon[0]
+
+	jsonBytes, err := json.Marshal(payload)
+		if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonBytes))
+    req.Header.Set("Content-Type", "application/json")
+	if err != nil {
+        return err
+    }
+
+    client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+    resp, err := client.Do(req)
+    if err != nil {
+        return err
+    }
+    defer resp.Body.Close()
+
+	
+    body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+    }
+	
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("could not associate device: %s", string(body))
+	}
+
+	return nil
 }
