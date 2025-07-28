@@ -34,7 +34,6 @@ type cmdTelemAgent struct {
 	clientMixin
 	Positional struct {
 		Email string
-		Password string
 	} `positional-args:"yes"`
 }
 

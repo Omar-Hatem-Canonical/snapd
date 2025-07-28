@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -40,19 +41,41 @@ func (c *Client) DeviceSession() (deviceSession []string, err error) {
 	return
 }
 
-func (c *Client) Associate(email string, password string, otp string) error {
-	url := "http://localhost:1234"
-
-	var payload struct {
-		Email     string  `json:"email"`
-		Password  string  `json:"password"`
-		OTP       string  `json:"otp"`
-		Macaroon  string  `json:"macaroon"`
+// Login logs user in.
+func (client *Client) CheckEmail(email, password, otp string) (bool, error) {
+	postData := loginData{
+		Email:    email,
+		Password: password,
+		Otp:      otp,
+	}
+	var body bytes.Buffer
+	if err := json.NewEncoder(&body).Encode(postData); err != nil {
+		return false, err
 	}
 
-	payload.Email = email
-	payload.Password = password
-	payload.OTP = otp
+	var user User
+	if _, err := client.doSync("POST", "/v2/login", nil, nil, &body, &user); err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+func (c *Client) Associate(email string, password string, otp string) error {
+	url := os.Getenv("TELEMGW_SERVICE_URL")
+
+	isEmailOk, err := c.CheckEmail(email, password, otp)
+	if err != nil {
+		return err
+	}
+	
+	if !isEmailOk {
+		return errors.New("email or password are incorrect")
+	}
+
+	var payload struct {
+		Macaroon  string  `json:"macaroon"`
+	}
 
 	macaroon, err := c.DeviceSession()
 	if err != nil {
@@ -73,7 +96,7 @@ func (c *Client) Associate(email string, password string, otp string) error {
     }
 
     client := &http.Client{
-		Timeout: 5 * time.Second,
+		Timeout: 10 * time.Second,
 	}
     resp, err := client.Do(req)
     if err != nil {
