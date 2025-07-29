@@ -73,7 +73,7 @@ func associateDeviceWith2faRetry(cli *client.Client, email, password string) err
 
 	for i := 0; ; i++ {
 		// first try is without otp
-		_, err = cli.Login(email, password, string(otp))
+		err = cli.Associate(email, password, string(otp))
 		if i >= len(msgs) || !client.IsTwoFactorError(err) {
 			return err
 		}
