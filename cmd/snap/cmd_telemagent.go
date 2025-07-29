@@ -73,7 +73,7 @@ func associateDeviceWith2faRetry(cli *client.Client, email, password string) err
 
 	for i := 0; ; i++ {
 		// first try is without otp
-		err = cli.Associate(email, password, string(otp))
+		err = cli.Associate(email, password, string(otp), false)
 		if i >= len(msgs) || !client.IsTwoFactorError(err) {
 			return err
 		}
@@ -101,25 +101,38 @@ func associateDevice(cli *client.Client, email string) error {
 }
 
 func (x *cmdTelemAgent) Execute(args []string) error {
+	email, err := x.client.WhoAmI()
+	if err != nil {
+		return err
+	}
+
 	if len(args) > 0 {
 		return ErrExtraArgs
 	}
 
-	//TRANSLATORS: after the "... at" follows a URL in the next line
-	fmt.Fprint(Stdout, i18n.G("Personal information is handled as per our privacy notice at\n"))
-	fmt.Fprint(Stdout, "https://www.ubuntu.com/legal/dataprivacy/snap-store\n\n")
-
-	email := x.Positional.Email
 	if email == "" {
-		fmt.Fprint(Stdout, i18n.G("Email address: "))
-		in, _, err := bufio.NewReader(Stdin).ReadLine()
-		if err != nil {
-			return err
+		
+		//TRANSLATORS: after the "... at" follows a URL in the next line
+		fmt.Fprint(Stdout, i18n.G("Personal information is handled as per our privacy notice at\n"))
+		fmt.Fprint(Stdout, "https://www.ubuntu.com/legal/dataprivacy/snap-store\n\n")
+		
+		email = x.Positional.Email
+		if email == "" {
+			fmt.Fprint(Stdout, i18n.G("Email address: "))
+			in, _, err := bufio.NewReader(Stdin).ReadLine()
+			if err != nil {
+				return err
+			}
+			email = string(in)
 		}
-		email = string(in)
+
+		err = associateDevice(x.client, email)
+	} else {
+		err = x.client.Associate(email, "", "", true)
 	}
 
-	err := associateDevice(x.client, email)
+
+
 	if err != nil {
 		return err
 	}

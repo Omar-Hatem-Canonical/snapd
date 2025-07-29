@@ -61,17 +61,20 @@ func (client *Client) CheckEmail(email, password, otp string) (bool, error) {
 	return true, nil
 }
 
-func (c *Client) Associate(email string, password string, otp string) error {
+func (c *Client) Associate(email string, password string, otp string, isLogged bool) error {
 	url := os.Getenv("TELEMGW_SERVICE_URL")
 
-	isEmailOk, err := c.CheckEmail(email, password, otp)
-	if err != nil {
-		return err
+	if !isLogged {
+		isEmailOk, err := c.CheckEmail(email, password, otp)
+		if err != nil {
+			return err
+		}
+		
+		if !isEmailOk {
+			return errors.New("email or password are incorrect")
+		}
 	}
-	
-	if !isEmailOk {
-		return errors.New("email or password are incorrect")
-	}
+
 
 	var payload struct {
 		Macaroon  string  `json:"macaroon"`
