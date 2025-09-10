@@ -19,6 +19,7 @@ import (
 	"github.com/canonical/mqtt.golang/autopaho"
 	"github.com/canonical/mqtt.golang/autopaho/extensions/rpc"
 	"github.com/canonical/mqtt.golang/paho"
+	"github.com/snapcore/snapd/client"
 	"github.com/snapcore/snapd/telemagent/internal/utils"
 	mptls "github.com/snapcore/snapd/telemagent/pkg/tls"
 	"golang.org/x/sync/errgroup"
@@ -83,6 +84,16 @@ func NewServer(cfg Config, logger *slog.Logger, brokerConn *net.Conn) (*Server, 
 		return nil, err
 	}
 
+	snapClient := client.New(nil)
+
+	macaroon, err := snapClient.DeviceSession()
+	if err != nil {
+		return nil, err
+	}
+
+	logger.Info(fmt.Sprintf("Connecting with username: %s", deviceID))
+
+
 	cliCfg := autopaho.ClientConfig{
 		ServerUrls:                    []*url.URL{u},
 		KeepAlive:                     20,
@@ -94,6 +105,15 @@ func NewServer(cfg Config, logger *slog.Logger, brokerConn *net.Conn) (*Server, 
 		},
 		OnConnectError: func(err error) { logger.Error(fmt.Sprintf("error whilst attempting connection: %s\n", err)) },
 		AttemptConnection: attemptFunc,
+		ConnectUsername: deviceID,
+		ConnectPassword: []byte(macaroon[0]),
+		ConnectPacketBuilder: func(cp *paho.Connect, u *url.URL) (*paho.Connect, error) {
+			if cp.Properties == nil {
+				cp.Properties = &paho.ConnectProperties{}
+			}
+			cp.Properties.User = append(cp.Properties.User, paho.UserProperty{Key: "client-type", Value: "device"})
+			return cp, nil
+		},
 		ClientConfig: paho.ClientConfig{
 			ClientID:      deviceID + "-" + strconv.Itoa(1e4+rand.Int()%9e4),
 			OnClientError: func(err error) { logger.Error(fmt.Sprintf("client error: %s\n", err)) },
@@ -175,13 +195,13 @@ func (s *Server) echoHandler(writer http.ResponseWriter, request *http.Request) 
 		s.logger.Error(err.Error())
 		return
 	}
-	s.logger.Info("Received response for request")
-
+	
 	resp, err := h.Request(s.ctx, &paho.Publish{
 		Topic:   localPubTopic,
 		Payload: data,
 		QoS:     2,
 	})
+	s.logger.Info("Received response for request")
 	if err != nil {
 		writer.WriteHeader(http.StatusBadRequest)
 		writer.Write(fmt.Appendf(nil, "error in response: %s", err))
