@@ -3,10 +3,11 @@
 package rest
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"math/rand"
 	"net"
@@ -63,6 +64,20 @@ type Server struct {
 	logger *slog.Logger
 
 	mux *http.ServeMux
+}
+
+type HttpRequest struct {
+	Scheme string `json:"schema"`
+	Method string `json:"method"`
+	Path   string `json:"path"`
+	Body   string `json:"body"`
+	Headers map[string][]string `json:"headers"`
+}
+
+type HttpResponse struct {
+	StatusCode int `json:"status-code"`
+	Headers map[string][]string `json:"headers"`
+	Body   string `json:"body"`
 }
 
 func NewServer(cfg Config, logger *slog.Logger, brokerConn *net.Conn) (*Server, error) {
@@ -139,15 +154,6 @@ func NewServer(cfg Config, logger *slog.Logger, brokerConn *net.Conn) (*Server, 
 }
 
 func (s *Server) echoHandler(writer http.ResponseWriter, request *http.Request) {
-	var buf bytes.Buffer
-	err := request.Write(&buf)
-	if err != nil {
-		writer.WriteHeader(http.StatusBadRequest)
-		writer.Write([]byte("Could not convert requests to byte stream"))
-		s.logger.Error("Could not convert requests to byte stream")
-		return
-	}
-
 	snapPublisher, snapName, err := s.detectSnap(request.RemoteAddr)
 	if err != nil {
 		s.logger.Error(fmt.Sprintf("Could not get snap name: %s", err.Error()))
@@ -160,7 +166,30 @@ func (s *Server) echoHandler(writer http.ResponseWriter, request *http.Request) 
 
 	s.logger.Info("Handling request made to " + request.URL.Path + " to client (" + request.RemoteAddr + ")")
 
-	data := buf.Bytes()
+	body, err := io.ReadAll(request.Body)
+	if err != nil {
+		writer.WriteHeader(http.StatusBadRequest)
+		writer.Write([]byte("Could not read request body"))
+
+		s.logger.Error(err.Error())
+		return
+	}
+
+	payload := HttpRequest{
+        Method:  request.Method,
+        Path:    request.URL.Path,
+        Headers: request.Header,
+        Body:    string(body),
+    }
+    
+	data, err := json.Marshal(payload)
+	if err != nil {
+		writer.WriteHeader(http.StatusBadRequest)
+		writer.Write([]byte("Could not serialize request"))
+
+		s.logger.Error(err.Error())
+		return
+	}
 
 	deviceId, err := utils.GetDeviceId()
 	if err != nil {
@@ -209,9 +238,24 @@ func (s *Server) echoHandler(writer http.ResponseWriter, request *http.Request) 
 		return
 	}
 
-	writer.Header().Set("Access-Control-Allow-Origin", "*")
-	writer.Header().Set("Content-Type", request.Header.Get("Content-Type"))
-	writer.Write(resp.Payload)
+	var responsePacket HttpResponse
+	err = json.Unmarshal(resp.Payload, &responsePacket)
+	if err != nil {
+		writer.WriteHeader(http.StatusBadRequest)
+		writer.Write(fmt.Appendf(nil, "failed to unmarshal re: %s", err))
+		s.logger.Error(err.Error())
+		return
+	}
+
+	for name, values := range responsePacket.Headers {
+        for _, value := range values {
+            writer.Header().Add(name, value)
+        }
+	}
+
+	writer.WriteHeader(responsePacket.StatusCode)
+
+	writer.Write([]byte(responsePacket.Body))
 }
 
 func (s *Server) Start(ctx context.Context) error {
