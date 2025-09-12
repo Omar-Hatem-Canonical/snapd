@@ -3,15 +3,20 @@ package utils
 import (
 	"context"
 	"fmt"
+	"math"
 	"net"
 	"os"
 	"path"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cakturk/go-netstat/netstat"
+	"github.com/snapcore/snapd/asserts"
 	"github.com/snapcore/snapd/client"
 )
+
+const WAIT_TIME = 500 // Half second delay to respect rate limits
 
 func getSnapNamePublisherIDFromPID(pid int) (string, string, error) {
 	procPath := path.Join("/proc", strconv.Itoa(pid), "exe")
@@ -88,8 +93,20 @@ func GetSnapInfoFromConn(addr string) (string, string, error) {
 func GetDeviceId() (string, error) {
 	snapClient := client.New(nil)
 
-	results, err := snapClient.Known("serial", make(map[string]string), nil)
+	var err error
+	var results []asserts.Assertion
+	for i := 0; i < 5; i++ { // Initialization; Condition; Post-statement
+		results, err = snapClient.Known("serial", make(map[string]string), nil)
+	
+		if err == nil && len(results) != 0 {
+			break
+		} else {
+			time.Sleep(WAIT_TIME * time.Duration(math.Pow(2, float64(i))) * time.Millisecond)
+		}
 
+		
+	}
+	
 	if err != nil {
 		return "", err
 	} else if len(results) == 0 {
