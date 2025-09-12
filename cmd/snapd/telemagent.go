@@ -137,14 +137,14 @@ func addEnv() {
 
 	os.Setenv("MPROXY_MQTT_WITH_TLS_ADDRESS",":8883")
 	os.Setenv("MPROXY_MQTT_WITH_TLS_TARGET","demo.staging:8883")
-	os.Setenv("MPROXY_MQTT_WITH_TLS_CERT_FILE","/home/ubuntu/snapd/telem-agent/ssl/certs/server.crt")
-	os.Setenv("MPROXY_MQTT_WITH_TLS_KEY_FILE","/home/ubuntu/snapd/telem-agent/ssl/certs/server.key")
-	os.Setenv("MPROXY_MQTT_WITH_TLS_SERVER_CA_FILE","/home/ubuntu/snapd/telem-agent/ssl/certs/ca.crt")
+	os.Setenv("MPROXY_MQTT_WITH_TLS_CERT_FILE","/home/ubuntu/src/github.com/snapcore/snapd/telemagent/ssl/certs/server.crt")
+	os.Setenv("MPROXY_MQTT_WITH_TLS_KEY_FILE","/home/ubuntu/src/github.com/snapcore/snapd/telemagent/ssl/certs/server.key")
+	os.Setenv("MPROXY_MQTT_WITH_TLS_SERVER_CA_FILE","/home/ubuntu/src/github.com/snapcore/snapd/telemagent/ssl/certs/ca.crt")
 
 
 	os.Setenv("REST_ENABLED","true")
 	os.Setenv("REST_ENDPOINT","mqtts://demo.staging:8883")
-	os.Setenv("REST_SERVER_CA_FILE","/home/ubuntu/snapd/telem-agent/ssl/certs/staging.cert")
+	os.Setenv("REST_SERVER_CA_FILE","/home/ubuntu/src/github.com/snapcore/snapd/telemagent/ssl/certs/staging.cert")
 	
 	os.Setenv("TELEMGW_SERVICE_URL","https://demo.staging/stg-telemetry-k8s-telemgw/device-registrations")
 
