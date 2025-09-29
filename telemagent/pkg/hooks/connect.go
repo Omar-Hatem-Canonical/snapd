@@ -260,7 +260,7 @@ func (h *ConnectHook) OnPublish(cl *mochi.Client, pk packets.Packet) (packets.Pa
 			h.Log.Error("Local namespace topic cannot start with $")
 			(pk.TopicName) = DeniedTopic
 			// error will be caught by interceptor
-			return packets.Packet{}, errors.New("Local namespace topic cannot start with $")
+			return packets.Packet{}, errors.New("local namespace topic cannot start with $")
 		}
 
 		newTopic := fmt.Sprintf("/%s/%s/%s", deviceId, snapPublisher, pk.TopicName)
