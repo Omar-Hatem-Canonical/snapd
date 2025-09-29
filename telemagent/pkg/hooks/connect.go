@@ -13,9 +13,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/snapcore/snapd/telemagent/internal/utils"
+	"github.com/snapcore/snapd/telemagent/pkg/utils"
 
-	mptls "github.com/snapcore/snapd/telemagent/internal/tls"
+	mptls "github.com/snapcore/snapd/telemagent/pkg/tls"
 
 	"github.com/caarlos0/env/v11"
 	"github.com/canonical/mqtt.golang/autopaho"
@@ -79,8 +79,19 @@ func (h *ConnectHook) Init(config any) error {
 		return mochi.ErrInvalidConfigType
 	}
 
-	deviceID := "generic.generic-classic.777631f3-0bd3-4373-96d4-9185acdf4836"
-	macaroon := []string{"MDAyNmxvY2F0aW9uIGFwaS5zdGFnaW5nLnNuYXBjcmFmdC5pbwowMDFlaWRlbnRpZmllciBkZXZpY2Utc2Vzc2lvbgowMDQ4Y2lkIGFwaS5zdGFnaW5nLnNuYXBjcmFmdC5pb3x2YWxpZF9zaW5jZXwyMDI1LTA4LTI1VDA3OjE2OjQ0LjY1ODQ0OAowMDRlY2lkIGFwaS5zdGFnaW5nLnNuYXBjcmFmdC5pb3xzZXNzaW9ufDM2NDQ5MTE3LWUyMTItNGFjNy1iYmI2LThkYzM1ZTk5OGJlNwowMGEzY2lkIGFwaS5zdGFnaW5nLnNuYXBjcmFmdC5pb3xkZXZpY2V8eyJhdXRob3JpdHkiOiAiZ2VuZXJpYyIsICJicmFuZCI6ICJnZW5lcmljIiwgIm1vZGVsIjogImdlbmVyaWMtY2xhc3NpYyIsICJzZXJpYWwiOiAiNzc3NjMxZjMtMGJkMy00MzczLTk2ZDQtOTE4NWFjZGY0ODM2In0KMDAyOGNpZCBhcGkuc3RhZ2luZy5zbmFwY3JhZnQuaW98c3RvcmV8CjAwMmZzaWduYXR1cmUgerv1dLOQoCKRpYiXRveTd6XSwsQEHWjKoVLatkUwo_sK"}
+	snapClient := client.New(nil)
+
+	macaroon, err := snapClient.DeviceSession()
+	if err != nil {
+		h.Log.Error(err.Error())
+	}
+
+	deviceID, err := utils.GetDeviceId()
+	if err != nil {
+		h.Log.Warn(err.Error())
+	}
+
+	h.Log.Info(fmt.Sprintf("Acquired device session macaroon: %s", macaroon[0]))
 
 	u, err := url.Parse(h.config.Cfg.Endpoint)
 	if err != nil {
