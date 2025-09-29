@@ -55,7 +55,7 @@ func telemagent() {
 	})
 
 	// Allow all connections.
-	err = server.AddHook(new(hooks.ConnectHook), &hooks.ConnectHookOptions{
+	err = server.AddHook(new(hooks.TelemAgentHook), &hooks.TelemAgentHookOptions{
 		Server: server,
 		Cfg:    serverConfig,
 	})
@@ -65,7 +65,7 @@ func telemagent() {
 	}
 
 	// Create a TCP listener on a standard port.
-	tcp := listeners.NewTCP(listeners.Config{ID: "t1", Address: ":1885"})
+	tcp := listeners.NewTCP(listeners.Config{ID: "t1", Address: serverConfig.BrokerPort})
 	err = server.AddListener(tcp)
 	if err != nil {
 		log.Fatal(err)
@@ -86,4 +86,5 @@ func telemagent() {
 
 func addEnv() {
 	os.Setenv("MQTT_ENDPOINT", "mqtt://demo.staging:1883")
+	os.Setenv("MQTT_BROKER_PORT", ":1885")
 }

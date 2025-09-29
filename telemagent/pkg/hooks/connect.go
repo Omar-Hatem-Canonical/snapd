@@ -2,16 +2,11 @@ package hooks
 
 import (
 	"bytes"
-	"context"
 	"crypto/tls"
-	"errors"
 	"fmt"
-	"log"
-	"log/slog"
 	"math/rand"
 	"net/url"
 	"strconv"
-	"strings"
 
 	"github.com/snapcore/snapd/telemagent/pkg/utils"
 
@@ -29,14 +24,15 @@ const DeniedTopic = "DENIED"
 const ErrorTopic = "ERROR"
 
 type Config struct {
-	Enabled   bool   `env:"ENABLED"     envDefault:"false"`
-	Endpoint  string `env:"ENDPOINT"     envDefault:"mqtt://localhost:1883"`
-	Port      int    `env:"PORT"     envDefault:"9090"`
+	Enabled         bool   `env:"ENABLED"     envDefault:"false"`
+	Endpoint        string `env:"ENDPOINT"     envDefault:"mqtt://localhost:1883"`
+	ServerPort      int    `env:"PORT"     envDefault:"9090"`
+	BrokerPort		string `env:"BROKER_PORT" envDefault:":1884"`
 	TLSConfig *tls.Config
 }
 
 // Options contains configuration settings for the hook.
-type ConnectHookOptions struct {
+type TelemAgentHookOptions struct {
 	Server     *mochi.Server
 	mqttConfig autopaho.ClientConfig
 	mqttClient *autopaho.ConnectionManager
@@ -44,9 +40,9 @@ type ConnectHookOptions struct {
 	Cfg        Config
 }
 
-type ConnectHook struct {
+type TelemAgentHook struct {
 	mochi.HookBase
-	config *ConnectHookOptions
+	config *TelemAgentHookOptions
 }
 
 func NewConfig(opts env.Options) (Config, error) {
@@ -68,13 +64,13 @@ func NewConfig(opts env.Options) (Config, error) {
 	return c, nil
 }
 
-func (h *ConnectHook) Init(config any) error {
+func (h *TelemAgentHook) Init(config any) error {
 	h.Log.Info("initialised")
-	if _, ok := config.(*ConnectHookOptions); !ok && config != nil {
+	if _, ok := config.(*TelemAgentHookOptions); !ok && config != nil {
 		return mochi.ErrInvalidConfigType
 	}
 
-	h.config = config.(*ConnectHookOptions)
+	h.config = config.(*TelemAgentHookOptions)
 	if h.config.Server == nil {
 		return mochi.ErrInvalidConfigType
 	}
@@ -139,11 +135,11 @@ func (h *ConnectHook) Init(config any) error {
 	return nil
 }
 
-func (h *ConnectHook) ID() string {
+func (h *TelemAgentHook) ID() string {
 	return "detect-snap"
 }
 
-func (h *ConnectHook) Provides(b byte) bool {
+func (h *TelemAgentHook) Provides(b byte) bool {
 	return bytes.Contains([]byte{
 		mochi.OnConnectAuthenticate,
 		mochi.OnSubscribe,
@@ -154,7 +150,7 @@ func (h *ConnectHook) Provides(b byte) bool {
 	}, []byte{b})
 }
 
-func (h *ConnectHook) OnConnectAuthenticate(cl *mochi.Client, pk packets.Packet) bool {
+func (h *TelemAgentHook) OnConnectAuthenticate(cl *mochi.Client, pk packets.Packet) bool {
 
 	snapPublisher, snapName, err := utils.GetSnapInfoFromConn(cl.Net.Conn.RemoteAddr().String())
 
@@ -168,194 +164,3 @@ func (h *ConnectHook) OnConnectAuthenticate(cl *mochi.Client, pk packets.Packet)
 	return true
 }
 
-func (h *ConnectHook) OnSubscribe(cl *mochi.Client, pk packets.Packet) packets.Packet {
-	var err error
-	var snapPublisher string
-	var snapName string
-
-	if snapPublisher, snapName, err = utils.GetSnapInfoFromConn(cl.Net.Conn.RemoteAddr().String()); err != nil {
-		h.Log.Warn("Could not get snap publisher")
-		return packets.Packet{Filters: packets.Subscriptions{{Filter: ErrorTopic}}}
-	}
-
-	for i := range pk.Filters {
-		if (pk.Filters)[i].Filter[0] != '/' {
-			var newTopic string
-
-			if (pk.Filters)[i].Filter[0] != '$' {
-				newTopic = fmt.Sprintf("/+/%s/%s", snapPublisher, (pk.Filters)[i].Filter)
-			} else {
-				h.Log.Error("Local namespace topics cannot start with $")
-				(pk.Filters)[i].Filter = DeniedTopic
-				continue
-			}
-
-			(pk.Filters)[i].Filter = newTopic
-
-			msg := fmt.Sprintf("Topic converted to global namespace, subscribing now to %s", (pk.Filters)[i].Filter)
-			h.Log.Info(msg)
-		} else {
-			if isValid := checkPublisher((pk.Filters)[i].Filter, snapName, snapPublisher, h.Log); !isValid {
-				continue
-			}
-		}
-
-		if _, err := h.config.mqttClient.Subscribe(context.Background(), &paho.Subscribe{
-			Subscriptions: []paho.SubscribeOptions{
-				{Topic: (pk.Filters)[i].Filter, QoS: 2},
-			},
-		}); err != nil {
-			h.Log.Error(fmt.Sprintf("failed to subscribe (%s). This is likely to mean no messages will be received.", err))
-		}
-	}
-
-	return pk
-}
-
-func checkPublisher(topic, snapName, snapPublisher string, logger *slog.Logger) bool {
-	return true
-}
-
-func (h *ConnectHook) OnACLCheck(cl *mochi.Client, topic string, write bool) bool {
-	if write {
-		return true
-	}
-
-	if topic == ErrorTopic || topic == DeniedTopic {
-		h.Log.Info("Topic rejected")
-		return false
-	}
-
-	return true
-}
-
-func (h *ConnectHook) OnPublish(cl *mochi.Client, pk packets.Packet) (packets.Packet, error) {
-	var err error
-	var snapPublisher string
-	var snapName string
-
-	if cl.Net.Inline {
-		return pk, nil
-	}
-
-	if snapPublisher, snapName, err = utils.GetSnapInfoFromConn(cl.Net.Conn.RemoteAddr().String()); err != nil {
-		h.Log.Warn("Could not get snap publisher")
-		return packets.Packet{}, errors.New("failed to get snap publisher")
-	}
-
-	if (pk.TopicName)[0] == '/' {
-		snapClient := client.New(nil)
-
-		if isAllowed, err := isAllowedTopic(snapClient, pk.TopicName, snapName, snapPublisher, "pub"); err != nil || !isAllowed {
-			h.Log.Warn("Topic is not allowed for publishing")
-			pk.TopicName = DeniedTopic
-		}
-	} else {
-		deviceId, err := utils.GetDeviceId()
-		if err != nil {
-			h.Log.Warn(err.Error())
-		}
-
-		if (pk.TopicName)[0] == '$' {
-			h.Log.Error("Local namespace topic cannot start with $")
-			(pk.TopicName) = DeniedTopic
-			// error will be caught by interceptor
-			return packets.Packet{}, errors.New("local namespace topic cannot start with $")
-		}
-
-		newTopic := fmt.Sprintf("/%s/%s/%s", deviceId, snapPublisher, pk.TopicName)
-
-		msg := fmt.Sprintf("Converting topic %s to global namespace, prepending topic with snap name %s", pk.TopicName, snapPublisher)
-		h.Log.Info(msg)
-
-		pk.TopicName = newTopic
-	}
-
-	if _, err := h.config.mqttClient.Publish(context.Background(), &paho.Publish{
-		QoS:     2,
-		Topic:   pk.TopicName,
-		Payload: pk.Payload,
-		Retain:  pk.FixedHeader.Retain,
-	}); err != nil {
-		return packets.Packet{}, err
-	}
-
-	return packets.Packet{}, errors.New("Client won't publish")
-}
-
-func isAllowedTopic(snapClient *client.Client, topic, snapName, snapPublisher, action string) (bool, error) {
-	levels := strings.Split(topic, "/")[1:]
-	if len(levels) < 2 {
-		return false, fmt.Errorf("invalid topic: no snap publisher")
-	}
-
-	if levels[1] == snapPublisher {
-		return true, nil
-	}
-
-	if action == "pub" {
-		return false, nil
-	}
-
-	return false, nil
-}
-
-func (h *ConnectHook) OnPacketEncode(cl *mochi.Client, pk packets.Packet) packets.Packet {
-	if pk.FixedHeader.Type == packets.Publish {
-		levels := strings.Split(pk.TopicName, "/")
-		levels = levels[1:]
-		if len(levels) > 1 {
-			var err error
-			var snapPublisher string
-
-			if snapPublisher, _, err = utils.GetSnapInfoFromConn(cl.Net.Conn.RemoteAddr().String()); err != nil {
-				h.Log.Warn("Could not get snap publisher")
-				return pk
-			}
-
-			deviceId, err := utils.GetDeviceId()
-			if err != nil {
-				h.Log.Warn(err.Error())
-			}
-
-			if deviceId == levels[0] && snapPublisher == levels[1] {
-				levels = levels[2:]
-			}
-
-			newTopic := strings.Join(levels, "/")
-			pk.TopicName = newTopic
-
-			h.Log.Info("Removed global namespace.")
-		} else {
-			h.Log.Warn("Could not find global namespace, leaving topic as is.")
-		}
-		return pk
-	}
-
-	return pk
-}
-
-func (h *ConnectHook) OnStarted() {
-	ctx := context.Background()
-
-	h.config.mqttConfig.OnPublishReceived = append(h.config.mqttConfig.OnPublishReceived, func(pr paho.PublishReceived) (bool, error) {
-		if err := h.config.Server.Publish(pr.Packet.Topic, pr.Packet.Payload, pr.Packet.Retain, pr.Packet.QoS); err != nil {
-			return false, err
-		}
-
-		h.Log.Info("Server received message from external broker, will resend")
-		return true, nil
-	})
-
-	c, err := autopaho.NewConnection(ctx, h.config.mqttConfig) // starts process; will reconnect until context cancelled
-	if err != nil {
-		log.Fatalf("could not connect to remote broker: %v", err)
-	}
-
-	h.config.mqttClient = c
-	// Wait for the connection to come up
-	if err = h.config.mqttClient.AwaitConnection(ctx); err != nil {
-		log.Fatalf("could not connect to remote broker: %v", err)
-	}
-
-}
