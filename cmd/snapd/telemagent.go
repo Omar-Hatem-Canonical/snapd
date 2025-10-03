@@ -1,8 +1,6 @@
 package main
 
 import (
-<<<<<<< HEAD
-=======
 	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
@@ -10,7 +8,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"errors"
->>>>>>> fb2c88504c (feat: update github lib)
 	"log"
 	"log/slog"
 	"math/big"
@@ -20,16 +17,10 @@ import (
 	"syscall"
 	"time"
 
-<<<<<<< HEAD
-	"github.com/snapcore/snapd/telemagent/pkg/hooks"
-
-	"github.com/caarlos0/env/v11"
-=======
 	"github.com/snapcore/snapd/client"
 	"github.com/snapcore/snapd/telemagent/pkg/hooks"
 	mptls "github.com/snapcore/snapd/telemagent/pkg/tls"
 
->>>>>>> fb2c88504c (feat: update github lib)
 	mochi "github.com/mochi-mqtt/server/v2"
 	"github.com/mochi-mqtt/server/v2/listeners"
 )
@@ -59,11 +50,7 @@ func telemagent() {
 	})
 
 	// rest HTTP server Configuration
-<<<<<<< HEAD
-	serverConfig, err := hooks.NewConfig(env.Options{Prefix: mqttPrefix})
-=======
 	serverConfig, err := buildConfig()
->>>>>>> fb2c88504c (feat: update github lib)
 	if err != nil {
 		panic(err)
 	}
@@ -71,11 +58,8 @@ func telemagent() {
 	// Create logger with custom handler
 	logger := slog.New(logHandler)
 
-<<<<<<< HEAD
-=======
 	// addEnv(logger)
 
->>>>>>> fb2c88504c (feat: update github lib)
 	// Create the new MQTT Server.
 	server := mochi.New(&mochi.Options{
 		Logger:       logger,
@@ -85,11 +69,7 @@ func telemagent() {
 	// Allow all connections.
 	err = server.AddHook(new(hooks.TelemAgentHook), &hooks.TelemAgentHookOptions{
 		Server: server,
-<<<<<<< HEAD
-		Cfg:    serverConfig,
-=======
 		Cfg:    *serverConfig,
->>>>>>> fb2c88504c (feat: update github lib)
 	})
 
 	if err != nil {
@@ -97,15 +77,11 @@ func telemagent() {
 	}
 
 	// Create a TCP listener on a standard port.
-<<<<<<< HEAD
-	tcp := listeners.NewTCP(listeners.Config{ID: "t1", Address: serverConfig.BrokerPort})
-=======
 	tcp := listeners.NewTCP(listeners.Config{
 		ID:        "t1",
 		Address:   serverConfig.BrokerPort,
 		TLSConfig: serverConfig.TLSConfig,
 	})
->>>>>>> fb2c88504c (feat: update github lib)
 	err = server.AddListener(tcp)
 	if err != nil {
 		log.Fatal(err)
@@ -122,13 +98,6 @@ func telemagent() {
 	<-done
 
 	// Cleanup
-<<<<<<< HEAD
-}
-
-func addEnv() {
-	os.Setenv("MQTT_ENDPOINT", "mqtt://demo.staging:1883")
-	os.Setenv("MQTT_BROKER_PORT", ":1885")
-=======
 }
 
 func addEnv(logger *slog.Logger) {
@@ -347,5 +316,4 @@ func buildConfig() (*hooks.Config, error) {
 	}
 
 	return &cfg, nil
->>>>>>> fb2c88504c (feat: update github lib)
 }
