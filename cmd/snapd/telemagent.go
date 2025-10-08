@@ -20,6 +20,7 @@ import (
 	"github.com/snapcore/snapd/client"
 	"github.com/snapcore/snapd/telemagent/pkg/hooks"
 	mptls "github.com/snapcore/snapd/telemagent/pkg/tls"
+	"github.com/snapcore/snapd/telemagent/pkg/utils"
 
 	mochi "github.com/mochi-mqtt/server/v2"
 	"github.com/mochi-mqtt/server/v2/listeners"
@@ -55,10 +56,19 @@ func telemagent() {
 		panic(err)
 	}
 
+	
 	// Create logger with custom handler
 	logger := slog.New(logHandler)
-
+	
 	// addEnv(logger)
+	if serverConfig.Email == "" {
+		brandAccount, err := utils.GetBrandAccount()
+		if err != nil {
+			panic(err)
+		}
+
+		serverConfig.Email = brandAccount
+	}
 
 	// Create the new MQTT Server.
 	server := mochi.New(&mochi.Options{
@@ -273,6 +283,26 @@ func buildConfig() (*hooks.Config, error) {
 
 		cfg.BrokerPort = ":1885"
 	}
+
+	confs, err = snapClient.Conf("system", []string{"telemagent.telemgw-url"})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, conf := range confs {
+		confStr, ok := conf.(string)
+		if !ok {
+			return nil, errors.New("cannot convert to string")
+		}
+
+		if confStr == "" {
+			_, err := snapClient.SetConf("system", map[string]any{"telemagent.telemgw-url": "https://demo.staging/stg-telemetry-k8s-telemgw"})
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
 
 	confs, err = snapClient.Conf("system", []string{"telemagent.ca-cert"})
 	if err != nil {

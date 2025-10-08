@@ -31,6 +31,7 @@ import (
 )
 
 func init() {
+	supportedConfigurations["core.telemagent.telemgw-url"] = true
 	supportedConfigurations["core.telemagent.ca-cert"] = true
 	supportedConfigurations["core.telemagent.endpoint"] = true
 	supportedConfigurations["core.telemagent.port"] = true
@@ -63,6 +64,16 @@ func validateTelemAgentConf(tr RunTransaction) error {
 		return err
 	}
 	_, err = url.Parse(endpoint)
+	if err != nil {
+		return err
+	}
+
+	//check url
+	u, err := coreCfg(tr, "telemagent.telemgw-url")
+	if err != nil {
+		return err
+	}
+	_, err = url.Parse(u)
 	if err != nil {
 		return err
 	}

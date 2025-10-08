@@ -26,9 +26,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"time"
 )
+
+const TelemGWPrefix = " /v1/devices"
 
 func (c *Client) DeviceSession() (deviceSession []string, err error) {
 	_, err = c.doSync("GET", "/v2/devicesession", nil, nil, nil, &deviceSession)
@@ -61,8 +62,23 @@ func (client *Client) CheckEmail(email, password, otp string) (bool, error) {
 }
 
 func (c *Client) Associate(email string, password string, otp string, isLogged bool) error {
-	url := os.Getenv("TELEMGW_SERVICE_URL")
+	confs, err := c.Conf("system", []string{"telemagent.telemgw-url"})
+	if err != nil {
+		return err
+	}
 
+	var url string
+
+	for _, conf := range confs {
+		confStr, ok := conf.(string)
+		if !ok {
+			return errors.New("cannot convert to string")
+		}
+
+		url = confStr
+	}
+
+	
 	if !isLogged {
 		isEmailOk, err := c.CheckEmail(email, password, otp)
 		if err != nil {
@@ -92,7 +108,7 @@ func (c *Client) Associate(email string, password string, otp string, isLogged b
 		return err
 	}
 
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonBytes))
+	req, err := http.NewRequest("POST", url+TelemGWPrefix, bytes.NewBuffer(jsonBytes))
 	req.Header.Set("Content-Type", "application/json")
 	if err != nil {
 		return err
@@ -115,6 +131,8 @@ func (c *Client) Associate(email string, password string, otp string, isLogged b
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("could not associate device: %s", string(body))
 	}
+
+	
 
 	return nil
 }
