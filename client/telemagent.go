@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -76,7 +77,9 @@ func (c *Client) Associate(email string, password string, otp string, isLogged b
 		}
 
 		url = confStr
-	}
+	} 
+
+	url = strings.Trim(url, " ")
 
 	
 	if !isLogged {

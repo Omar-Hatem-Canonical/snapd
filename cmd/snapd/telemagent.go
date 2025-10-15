@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/snapcore/snapd/client"
+	"github.com/snapcore/snapd/logger"
 	"github.com/snapcore/snapd/telemagent/pkg/hooks"
 	mptls "github.com/snapcore/snapd/telemagent/pkg/tls"
 	"github.com/snapcore/snapd/telemagent/pkg/utils"
@@ -49,8 +50,6 @@ func telemagent() {
 			return a
 		},
 	})
-
-	time.Sleep(30 * time.Second)
 
 	// rest HTTP server Configuration
 	serverConfig, err := buildConfig()
@@ -273,12 +272,7 @@ func buildConfig() (*hooks.Config, error) {
 
 	cfg.Email = email
 
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil, err
-	}
-	sslDir := filepath.Join(home, ".ssl")
-	certFile, serverCAFile, keyFile, err := generateCertificates(sslDir)
+	certFile, serverCAFile, keyFile, err := generateCertificates("/etc/ssl")
 	if err != nil {
 		return nil, err
 	}
@@ -288,8 +282,12 @@ func buildConfig() (*hooks.Config, error) {
 		return nil, err
 	}
 
+	logger.Debugf("server ca file: %s", serverCAFile)
+	logger.Debugf("cert ca file: %s", certFile)
+	logger.Debugf("key file: %s", keyFile)
+
 	tlsCfg := mptls.Config{
-		CertFile:     certFile,
+		CertFile:     serverCAFile,
 		ServerCAFile: serverCAFile,
 		KeyFile:      keyFile,
 	}
