@@ -28,6 +28,7 @@ import (
 	"os"
 
 	"github.com/snapcore/snapd/overlord/restart"
+	"github.com/snapcore/snapd/strutil"
 )
 
 func init() {
@@ -38,47 +39,58 @@ func init() {
 }
 
 func validateTelemAgentConf(tr RunTransaction) error {
-	// check cert
-	sslPath, err := coreCfg(tr, "telemagent.ca-cert")
-	if err != nil {
-		return err
+
+	if strutil.ListContains(tr.Changes(), "telemagent.ca-cert") {
+		sslPath, err := coreCfg(tr, "telemagent.ca-cert")
+		if err != nil {
+			return err
+		}
+
+		// check cert
+
+		data, err := os.ReadFile(sslPath)
+		if err != nil {
+			return err
+		}
+
+		block, _ := pem.Decode(data)
+		if block == nil || block.Type != "CERTIFICATE" {
+			return errors.New("not a PEM certificate")
+		}
+		_, err = x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return err
+		}
 	}
 
-	data, err := os.ReadFile(sslPath)
-	if err != nil {
-		return err
+	if strutil.ListContains(tr.Changes(), "telemagent.endpoint") {
+		//check endpoint
+		endpoint, err := coreCfg(tr, "telemagent.endpoint")
+		if err != nil {
+			return err
+		}
+		_, err = url.Parse(endpoint)
+		if err != nil {
+			return err
+		}
 	}
 
-	block, _ := pem.Decode(data)
-	if block == nil || block.Type != "CERTIFICATE" {
-		return errors.New("not a PEM certificate")
+	
+	if strutil.ListContains(tr.Changes(), "telemagent.telemgw-url") {
+		//check url
+		u, err := coreCfg(tr, "telemagent.telemgw-url")
+		if err != nil {
+			return err
+		}
+		_, err = url.Parse(u)
+		if err != nil {
+			return err
+		}
 	}
-	_, err = x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return err
-	}
+	
 
-	//check endpoint
-	endpoint, err := coreCfg(tr, "telemagent.endpoint")
-	if err != nil {
-		return err
-	}
-	_, err = url.Parse(endpoint)
-	if err != nil {
-		return err
-	}
 
-	//check url
-	u, err := coreCfg(tr, "telemagent.telemgw-url")
-	if err != nil {
-		return err
-	}
-	_, err = url.Parse(u)
-	if err != nil {
-		return err
-	}
-
-	return err
+	return nil
 }
 
 func handleTelemAgentConfiguration(tr RunTransaction, opts *fsOnlyContext) error {

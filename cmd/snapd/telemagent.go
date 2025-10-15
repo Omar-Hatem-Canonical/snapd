@@ -50,12 +50,16 @@ func telemagent() {
 		},
 	})
 
+	time.Sleep(30 * time.Second)
+
 	// rest HTTP server Configuration
 	serverConfig, err := buildConfig()
 	if err != nil {
 		panic(err)
 	}
 
+	// serverConfig := defaultConfig()
+	// var err error
 	
 	// Create logger with custom handler
 	logger := slog.New(logHandler)
@@ -238,112 +242,105 @@ func generateCertificates(outDir string) (string, string, string, error) {
 }
 
 func buildConfig() (*hooks.Config, error) {
-	snapClient := client.New(nil)
 
 	var cfg hooks.Config
 
-	confs, err := snapClient.Conf("system", []string{"telemagent.endpoint"})
+
+
+	endpoint, err := setIfEmpty("telemagent.endpoint", "mqtt://demo.staging:1883")
 	if err != nil {
 		return nil, err
 	}
 
-	for _, conf := range confs {
-		confStr, ok := conf.(string)
-		if !ok {
-			return nil, errors.New("cannot convert to string")
-		}
+	cfg.Endpoint = endpoint
 
-		if confStr == "" {
-			_, err := snapClient.SetConf("system", map[string]any{"telemagent.endpoint": "mqtt://demo.staging:1883"})
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		cfg.Endpoint = "mqtt://demo.staging:1883"
-	}
-
-	confs, err = snapClient.Conf("system", []string{"telemagent.port"})
+	port, err := setIfEmpty("telemagent.port", ":1885")
 	if err != nil {
 		return nil, err
 	}
 
-	for _, conf := range confs {
-		confStr, ok := conf.(string)
-		if !ok {
-			return nil, errors.New("cannot convert to string")
-		}
+	cfg.BrokerPort = port
 
-		if confStr == "" {
-			_, err := snapClient.SetConf("system", map[string]any{"telemagent.port": ":1885"})
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		cfg.BrokerPort = ":1885"
-	}
-
-	confs, err = snapClient.Conf("system", []string{"telemagent.telemgw-url"})
+	_, err = setIfEmpty("telemagent.telemgw-url", "http://demo.staging/stg-telemetry-k8s-telemgw")
 	if err != nil {
 		return nil, err
 	}
 
-	for _, conf := range confs {
-		confStr, ok := conf.(string)
-		if !ok {
-			return nil, errors.New("cannot convert to string")
-		}
-
-		if confStr == "" {
-			_, err := snapClient.SetConf("system", map[string]any{"telemagent.telemgw-url": "https://demo.staging/stg-telemetry-k8s-telemgw"})
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-
-
-	confs, err = snapClient.Conf("system", []string{"telemagent.ca-cert"})
+	email, err := setIfEmpty("telemagent.email", "generic")
 	if err != nil {
 		return nil, err
 	}
 
-	for _, conf := range confs {
-		confStr, ok := conf.(string)
-		if !ok {
-			return nil, errors.New("cannot convert to string")
-		}
+	cfg.Email = email
 
-		if confStr == "" {
-			home, err := os.UserHomeDir()
-			if err != nil {
-				return nil, err
-			}
-			sslDir := filepath.Join(home, ".ssl")
-			certFile, serverCAFile, keyFile, err := generateCertificates(sslDir)
-			if err != nil {
-				return nil, err
-			}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+	sslDir := filepath.Join(home, ".ssl")
+	certFile, serverCAFile, keyFile, err := generateCertificates(sslDir)
+	if err != nil {
+		return nil, err
+	}
 
-			_, err = snapClient.SetConf("system", map[string]any{"telemagent.ca-cert": serverCAFile})
-			if err != nil {
-				return nil, err
-			}
+	serverCAFile, err = setIfEmpty("telemagent.ca-cert", serverCAFile)
+	if err != nil {
+		return nil, err
+	}
 
-			tlsCfg := mptls.Config{
-				CertFile:     certFile,
-				ServerCAFile: serverCAFile,
-				KeyFile:      keyFile,
-			}
+	tlsCfg := mptls.Config{
+		CertFile:     certFile,
+		ServerCAFile: serverCAFile,
+		KeyFile:      keyFile,
+	}
 
-			cfg.TLSConfig, err = mptls.Load(&tlsCfg)
-			if err != nil {
-				return nil, err
-			}
-
-		}
+	cfg.TLSConfig, err = mptls.Load(&tlsCfg)
+	if err != nil {
+		return nil, err
 	}
 
 	return &cfg, nil
+}
+
+
+func defaultConfig() *hooks.Config {
+	return &hooks.Config{
+		Enabled: true,
+		Endpoint: "mqtt://demo.staging:1883",
+		BrokerPort: ":1885",
+	}
+}
+
+func setIfEmpty(conf, value string) (string, error) {
+	snapClient := client.New(nil)
+
+	confs, err := snapClient.Conf("system", []string{conf})
+	if err != nil && err.(*client.Error).Kind != client.ErrorKindConfigNoSuchOption {
+		return value, err
+	}
+
+
+	if len(confs) > 1 {
+		return value, errors.New("multiple configs found")
+	}
+	
+	var confStr string
+	var ok bool
+	if len(confs) == 1 {
+		confStr, ok = confs[conf].(string)
+		if !ok {
+			return value, errors.New("cannot convert to string")
+		}
+	}
+
+	if confStr == "" {
+		_, err := snapClient.SetConf("system", map[string]any{conf: value})
+		if err != nil {
+			return value, err
+		}
+	} else {
+		return confStr, nil
+	}
+
+	return value, nil
 }
