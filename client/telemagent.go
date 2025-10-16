@@ -21,16 +21,18 @@ package client
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"time"
+
+	"github.com/snapcore/snapd/logger"
 )
 
-const TelemGWPrefix = " /v1/devices"
+const TelemGWPrefix = "/device-registrations"
 
 func (c *Client) DeviceSession() (deviceSession []string, err error) {
 	_, err = c.doSync("GET", "/v2/devicesession", nil, nil, nil, &deviceSession)
@@ -77,11 +79,8 @@ func (c *Client) Associate(email string, password string, otp string, isLogged b
 		}
 
 		url = confStr
-	} 
+	}
 
-	url = strings.Trim(url, " ")
-
-	
 	if !isLogged {
 		isEmailOk, err := c.CheckEmail(email, password, otp)
 		if err != nil {
@@ -111,14 +110,21 @@ func (c *Client) Associate(email string, password string, otp string, isLogged b
 		return err
 	}
 
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+
 	req, err := http.NewRequest("POST", url+TelemGWPrefix, bytes.NewBuffer(jsonBytes))
 	req.Header.Set("Content-Type", "application/json")
 	if err != nil {
 		return err
 	}
 
+	logger.Debugf("url = %s", url+TelemGWPrefix)
+
 	client := &http.Client{
-		Timeout: 10 * time.Second,
+		Timeout:   10 * time.Second,
+		Transport: transport,
 	}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -132,10 +138,8 @@ func (c *Client) Associate(email string, password string, otp string, isLogged b
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("could not associate device: %s", string(body))
+		return fmt.Errorf("could not associate device with url %q: %s", url+TelemGWPrefix, string(body))
 	}
-
-	
 
 	return nil
 }

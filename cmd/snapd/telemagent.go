@@ -59,10 +59,10 @@ func telemagent() {
 
 	// serverConfig := defaultConfig()
 	// var err error
-	
+
 	// Create logger with custom handler
 	logger := slog.New(logHandler)
-	
+
 	// addEnv(logger)
 	if serverConfig.Email == "" {
 		brandAccount, err := utils.GetBrandAccount()
@@ -244,8 +244,6 @@ func buildConfig() (*hooks.Config, error) {
 
 	var cfg hooks.Config
 
-
-
 	endpoint, err := setIfEmpty("telemagent.endpoint", "mqtt://demo.staging:1883")
 	if err != nil {
 		return nil, err
@@ -300,11 +298,10 @@ func buildConfig() (*hooks.Config, error) {
 	return &cfg, nil
 }
 
-
 func defaultConfig() *hooks.Config {
 	return &hooks.Config{
-		Enabled: true,
-		Endpoint: "mqtt://demo.staging:1883",
+		Enabled:    true,
+		Endpoint:   "mqtt://demo.staging:1883",
 		BrokerPort: ":1885",
 	}
 }
@@ -317,11 +314,10 @@ func setIfEmpty(conf, value string) (string, error) {
 		return value, err
 	}
 
-
 	if len(confs) > 1 {
 		return value, errors.New("multiple configs found")
 	}
-	
+
 	var confStr string
 	var ok bool
 	if len(confs) == 1 {

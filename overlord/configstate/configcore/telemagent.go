@@ -35,6 +35,7 @@ func init() {
 	supportedConfigurations["core.telemagent.ca-cert"] = true
 	supportedConfigurations["core.telemagent.endpoint"] = true
 	supportedConfigurations["core.telemagent.port"] = true
+	supportedConfigurations["core.telemagent.email"] = true
 }
 
 func validateTelemAgentConf(tr RunTransaction) error {
@@ -79,7 +80,6 @@ func validateTelemAgentConf(tr RunTransaction) error {
 	if err != nil {
 		return err
 	}
-
 
 	return nil
 }

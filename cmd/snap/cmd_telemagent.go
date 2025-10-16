@@ -35,7 +35,7 @@ type cmdTelemAgent struct {
 	clientMixin
 	Positional struct {
 		Command string `required:"yes"`
-		Email string
+		Email   string
 	} `positional-args:"yes"`
 }
 
@@ -54,19 +54,19 @@ func init() {
 		func() flags.Commander {
 			return &cmdTelemAgent{}
 		}, nil, []argDesc{
-		{
-			// TRANSLATORS: This is a noun, and it needs to begin with < and end with >
-			name: i18n.G("<email>"),
-			// TRANSLATORS: This should not start with a lowercase letter (unless it's "login.ubuntu.com")
-			desc: i18n.G("The login.ubuntu.com email to login as"),
-		},
-		{
-			// TRANSLATORS: This is a noun, and it needs to begin with < and end with >
-			name: i18n.G("<command>"),
-			// TRANSLATORS: This should not start with a lowercase letter (unless it's "login.ubuntu.com")
-			desc: i18n.G("The telemagent command to execute"),
-		},
-	})
+			{
+				// TRANSLATORS: This is a noun, and it needs to begin with < and end with >
+				name: i18n.G("<email>"),
+				// TRANSLATORS: This should not start with a lowercase letter (unless it's "login.ubuntu.com")
+				desc: i18n.G("The login.ubuntu.com email to login as"),
+			},
+			{
+				// TRANSLATORS: This is a noun, and it needs to begin with < and end with >
+				name: i18n.G("<command>"),
+				// TRANSLATORS: This should not start with a lowercase letter (unless it's "login.ubuntu.com")
+				desc: i18n.G("The telemagent command to execute"),
+			},
+		})
 }
 
 func associateDeviceWith2faRetry(cli *client.Client, email, password string) error {
