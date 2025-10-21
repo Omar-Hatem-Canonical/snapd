@@ -57,9 +57,6 @@ func telemagent() {
 		panic(err)
 	}
 
-	// serverConfig := defaultConfig()
-	// var err error
-
 	// Create logger with custom handler
 	logger := slog.New(logHandler)
 
