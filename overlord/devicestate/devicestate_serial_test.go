@@ -1142,7 +1142,6 @@ func (s *deviceMgrSerialSuite) TestFullDeviceRegistrationHappyPrepareDeviceHook(
 
 	// without a seeded device, there is no become-operational change
 	becomeOperational := s.findBecomeOperationalChange()
-
 	c.Assert(becomeOperational, IsNil)
 
 	// now mark it as seeded
@@ -1150,13 +1149,11 @@ func (s *deviceMgrSerialSuite) TestFullDeviceRegistrationHappyPrepareDeviceHook(
 	// and run the device registration again
 	s.state.Unlock()
 	s.settle(c)
-
 	s.state.Lock()
 
 	becomeOperational = s.findBecomeOperationalChange()
 
 	c.Assert(becomeOperational, NotNil)
-
 	c.Check(becomeOperational.Status().Ready(), Equals, true)
 	c.Check(becomeOperational.Err(), IsNil)
 
