@@ -2,6 +2,18 @@
 
 This document provides a comprehensive overview of all packet tagging related code found in the snapd repository.
 
+## Quick Reference
+
+| Feature | Location | Description |
+|---------|----------|-------------|
+| Cgroup classid tagging | `cmd/libsnap-confine-private/bpf/vendor/linux/bpf.h:1784` | Tag packets by cgroup membership |
+| Route realm tagging | `cmd/libsnap-confine-private/bpf/vendor/linux/bpf.h:1978` | Tag packets by routing table entry |
+| VLAN push/pop | `cmd/libsnap-confine-private/bpf/vendor/linux/bpf.h:1810,1826` | Add/remove VLAN tags |
+| Socket buffer struct | `cmd/libsnap-confine-private/bpf/vendor/linux/bpf.h:5146` | Data structure with tagging fields |
+| Network control interface | `interfaces/builtin/network_control.go:181` | Permission for packet operations |
+| Net_cls cgroup | `interfaces/builtin/greengrass_support.go:136` | Cgroup-based packet classifier |
+| VLAN bridge filtering | `interfaces/builtin/firewall_control.go:125` | VLAN-tagged packet filtering |
+
 ## Overview
 
 Packet tagging in snapd is primarily implemented through BPF (Berkeley Packet Filter) functionality and network interface controls. The code allows for tagging network packets for traffic control, quality of service (QoS), and network isolation purposes.
@@ -241,14 +253,54 @@ To use packet tagging features:
 - tc-bpf(8) man page
 - iptables/netfilter documentation for packet marking
 
+## Implementation Status
+
+The packet tagging infrastructure in snapd is primarily **declarative** - it defines the BPF functions and data structures available for packet tagging, but these functions are not actively used in the current snapd codebase. The code serves as:
+
+1. **Infrastructure Layer**: Provides the necessary BPF headers and definitions imported from the Linux kernel
+2. **Interface Permissions**: Defines AppArmor rules that allow snaps to perform packet-level operations
+3. **Future Use**: Makes packet tagging capabilities available for future features and extensions
+
+The actual implementations using these functions would typically be in:
+- Custom BPF programs loaded by snaps with appropriate permissions
+- External tools that interact with snaps through these interfaces
+- Future snapd features that require network traffic classification
+
+## Code Examples
+
+### Reading a Packet Tag (Theoretical Usage)
+```c
+#include <linux/bpf.h>
+#include "bpf-insn.h"
+
+// Example BPF program to read cgroup classid
+struct bpf_insn prog[] = {
+    // Get the cgroup classid for traffic classification
+    BPF_RAW_INSN(BPF_JMP | BPF_CALL, 0, 0, 0, BPF_FUNC_get_cgroup_classid),
+    // Store result in register
+    BPF_MOV64_REG(BPF_REG_6, BPF_REG_0),
+    // Return success
+    BPF_EXIT_INSN(),
+};
+```
+
+### Accessing Socket Buffer Tags
+```c
+// Access fields from __sk_buff structure
+struct __sk_buff *skb = ctx;
+__u32 mark = skb->mark;           // Get packet mark
+__u32 classid = skb->tc_classid;  // Get TC classification
+__u32 vlan_tci = skb->vlan_tci;   // Get VLAN tag info
+```
+
 ## Summary
 
 The snapd repository contains comprehensive packet tagging support through:
-1. BPF helper functions for reading/writing packet tags
-2. Socket buffer structures with multiple tagging fields
-3. Interface permissions for packet-level network operations
-4. Cgroup integration for per-application tagging
-5. VLAN tag manipulation capabilities
-6. Traffic control classification support
+1. **BPF helper functions** for reading/writing packet tags (defined in vendor headers)
+2. **Socket buffer structures** with multiple tagging fields (`mark`, `vlan_tci`, `tc_classid`)
+3. **Interface permissions** for packet-level network operations (`network packet`)
+4. **Cgroup integration** for per-application tagging (net_cls references)
+5. **VLAN tag manipulation** capabilities (push/pop operations)
+6. **Traffic control classification** support (tc_classid, route realms)
 
-This infrastructure enables fine-grained network control, QoS, security policies, and network isolation for snaps.
+This infrastructure enables fine-grained network control, QoS, security policies, and network isolation for snaps. The code provides the foundation for implementing packet tagging features, though the actual BPF programs would need to be developed separately and loaded by snaps with appropriate permissions.
