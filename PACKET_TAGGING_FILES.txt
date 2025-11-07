@@ -1,0 +1,136 @@
+================================================================================
+PACKET TAGGING CODE FILES IN SNAPD REPOSITORY
+================================================================================
+
+This file lists all files containing packet tagging related code.
+
+CORE BPF INFRASTRUCTURE
+================================================================================
+1. cmd/libsnap-confine-private/bpf/vendor/linux/bpf.h
+   - Line 1784: bpf_get_cgroup_classid() - Retrieve cgroup classid for packet tagging
+   - Line 1810: bpf_skb_vlan_push() - Push VLAN tag to packet
+   - Line 1826: bpf_skb_vlan_pop() - Pop VLAN tag from packet
+   - Line 1978: bpf_get_route_realm() - Get route realm tag
+   - Line 4486: bpf_skb_cgroup_classid() - Alternative cgroup classid function
+   - Line 4802: BPF_FUNC_get_cgroup_classid enumeration
+   - Line 4936: BPF_FUNC_skb_cgroup_classid enumeration
+   - Line 5146: struct __sk_buff - Socket buffer with tagging fields
+   - Line 5153: vlan_tci field - VLAN Tag Control Information
+   - Line 5161: tc_classid field - Traffic Control classid
+   - Line 5995: h_vlan_TCI field in vlan header
+
+2. cmd/libsnap-confine-private/bpf/bpf-insn.h
+   - Line 142: BPF_LD_ABS - Direct packet access macro
+   - Line 152: BPF_LD_IND - Indirect packet access macro
+   - Provides BPF instruction macros for packet manipulation
+
+3. cmd/libsnap-confine-private/bpf/vendor/linux/bpf_common.h
+   - Common BPF definitions
+
+INTERFACE PERMISSIONS (AppArmor)
+================================================================================
+4. interfaces/builtin/network_control.go
+   - Line 181: "network packet," - Allows raw packet operations
+   - Grants packet-level network control to snaps
+
+5. interfaces/builtin/network_manager.go
+   - Line 59: "network packet," - NetworkManager packet access
+
+6. interfaces/builtin/ofono.go
+   - Line 88: "network packet," - Ofono telephony packet access
+
+7. interfaces/builtin/firewall_control.go
+   - Line 125: VLAN filtering - "@{PROC}/sys/net/bridge/bridge-nf-filter-vlan-tagged rw,"
+
+8. interfaces/builtin/greengrass_support.go
+   - Line 136-138: net_cls cgroup access for packet classification
+
+9. interfaces/apparmor/template.go
+   - Line 176: "/etc/libnl-3/{classid,pktloc} r," - Network library classifier config
+
+CGROUP INTEGRATION
+================================================================================
+10. sandbox/cgroup/cgroup_test.go
+    - Line 133: Test case with "8:net_cls,net_prio:/"
+    - Line 242: Test case with "6:net_cls,net_prio:/"
+
+KERNEL CRYPTO API (uses seqpacket protocol, related to packet operations)
+================================================================================
+11. interfaces/builtin/kernel_crypto_api.go
+    - Line 42: "network alg seqpacket," - Socket packet protocol
+
+12. interfaces/builtin/kubernetes_support.go
+    - Line 78-79: Comment and permission for network traffic control with seqpacket
+
+OTHER INTERFACES USING PACKET SOCKETS
+================================================================================
+13. interfaces/builtin/bluez.go
+    - Line 157: unix seqpacket sockets with security tags
+    - Line 199: unix seqpacket peer connections
+
+14. interfaces/builtin/mir.go
+    - Line 89: unix seqpacket receive/send with plug security tags
+    - Line 94: unix seqpacket receive/send with slot security tags
+
+15. interfaces/builtin/qualcomm_ipc_router.go
+    - Line 83: unix seqpacket connect/send/receive
+    - Line 95: unix seqpacket bind/listen
+    - Line 99: unix seqpacket accept/send/receive
+
+16. interfaces/builtin/opengl.go
+    - Line 135: unix seqpacket bind/listen for cuda
+
+TEST FILES
+================================================================================
+17. interfaces/builtin/kernel_crypto_api_test.go
+    - Line 83: Test verifying "network alg seqpacket," permission
+
+18. interfaces/builtin/mir_test.go
+    - Line 112: Test checking unix seqpacket permissions
+
+19. interfaces/builtin/qualcomm_ipc_router_test.go
+    - Line 250-251: Tests for unix seqpacket server permissions
+    - Line 262: Test for unix seqpacket client permissions
+
+OPENPGP PACKET HANDLING (Not network packet tagging, but packet format parsing)
+================================================================================
+20. asserts/gpgkeypairmgr_test.go
+    - Uses golang.org/x/crypto/openpgp/packet for GPG packet handling
+
+21. asserts/database_test.go
+    - Uses openpgp/packet for signature verification
+
+22. asserts/extkeypairmgr.go
+    - Uses openpgp/packet for external key management
+
+23. asserts/gpgkeypairmgr.go
+    - Uses openpgp/packet for GPG key operations
+
+24. asserts/privkeys_for_test.go
+    - Uses openpgp/packet for test keys
+
+25. asserts/crypto.go
+    - Uses openpgp/packet for cryptographic operations
+
+================================================================================
+SUMMARY
+================================================================================
+Total files with packet tagging code: 25+
+
+Main Categories:
+- BPF Infrastructure: 3 files (core packet tagging functionality)
+- Network Interface Permissions: 6 files (AppArmor rules)
+- Cgroup Integration: 1 file + test
+- Socket/Protocol Support: 6 files (seqpacket and packet sockets)
+- Test Files: 3 files
+- GPG Packet Parsing: 6 files (different kind of "packet")
+
+Primary packet tagging code location:
+  cmd/libsnap-confine-private/bpf/vendor/linux/bpf.h
+
+Key feature: The BPF header provides the infrastructure for:
+  - Cgroup-based packet tagging (net_cls)
+  - VLAN tag manipulation
+  - Traffic control classification
+  - Route realm tagging
+  - Generic packet marking
