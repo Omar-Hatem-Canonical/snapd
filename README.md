@@ -2,7 +2,7 @@
 
 # Welcome to snapd
 
-> **Note:** This fork's `master` branch is dedicated to **TelemAgent** development. For the upstream snapd project, please visit the [official snapd repository](https://github.com/snapcore/snapd).
+> **Note:** This fork's `master` branch is dedicated to **TelemAgent** development. For the upstream snapd project, please visit the [official snapd repository](https://github.com/canonical/snapd).
 
 This is the code repository for **snapd**, the background service that manages
 and maintains installed snaps.
